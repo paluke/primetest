@@ -153,8 +153,9 @@ unsigned min_nonres(uint64_t n)
   assert(n % 2 == 1);
 
   /* check for n % 8 in 3, 5 */
-  if ((n ^ (n >> 1)) & 2)
-    return 4; // should be 2
+//  if ((n ^ (n >> 1)) & 2)
+//    return 2;
+  assert(n % 8 != 3 && n % 8 != 5);
 
   uint32_t inv = (n >> 1) & 1;
 
@@ -280,6 +281,34 @@ uint64_t pp1(uint64_t p, uint64_t m, uint64_t n)
   return rx;
 }
 
+uint64_t mul2mod(uint64_t a, uint64_t m)
+{
+  assert (a < m);
+  return (a >= m - a) ? a - (m - a) : a + a;
+}
+
+/* modular powering of (x + y√2) */
+uint64_t pp2(uint64_t m, uint64_t n)
+{
+  uint64_t prb = 1ull << (63 - __builtin_clzll(m));
+  uint64_t rx = 3, ry = 2;
+
+  while ((prb >>= 1) != 0)
+  {
+      ry = mul2mod(mulmod(rx, ry, n), n);
+      rx = mul2mod(mulmod(rx, rx, n), n);
+      rx = (rx ? rx : n) - 1;
+      if (m & prb)
+      {
+          uint64_t t = addmod(addmod(mul2mod(rx, n), rx, n), mul2mod(mul2mod(ry, n), n), n);
+          ry = addmod(addmod(mul2mod(ry, n), ry, n), mul2mod(rx, n), n);
+          rx = t;
+      }
+  }
+  return rx;
+}
+
+
 /* return a % b */
 uint64_t reminder(unsigned __int128 a, uint64_t b)
 {
@@ -319,13 +348,20 @@ int isprime(uint64_t n)
   if (n < 2047) // min base 2 strong pseudoprime
       return 1;
 
-  uint64_t p = min_nonres(n);
-  // if (p == 2) p = 4;
-  if (p == 0) //is square
-     return 0;
 
   uint64_t m = (n & 3) == 3 ? (n + 1) / 4 : (n + 1) / 2;
-  uint64_t rx = pp1(p, m, n);
+  uint64_t rx;
+
+  /* check for n % 8 in 3, 5 */
+  if ((n ^ (n >> 1)) & 2)
+     rx = pp2(m, n);
+  else
+  {
+     uint64_t p = min_nonres(n);
+     if (p == 0) //is square
+        return 0;
+     rx = pp1(p, m, n);
+  }
   return rx == ((n & 3) == 3 ? 0 : n - 1);
 }
 
